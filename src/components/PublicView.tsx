@@ -413,7 +413,7 @@ function StandingsTable({ pairs, matches, sets, playerMap }: {
             <tr key={row.pair_id} className={`hover:bg-ink-50 transition-colors ${i < 4 ? 'bg-brand-50/30' : ''}`}>
               <td className="px-3 py-3 text-center font-semibold text-ink-700">{i + 1}</td>
               <td className="px-3 py-3">
-                <div className="font-medium text-ink-900">{row.pair_name}</div>
+                <div className="font-medium text-ink-900">{row.player1_name} / {row.player2_name}</div>
                 <div className="text-xs text-ink-500">{row.player1_name} / {row.player2_name}</div>
               </td>
               <td className="px-3 py-3 text-center text-ink-700">{row.matches_played}</td>
