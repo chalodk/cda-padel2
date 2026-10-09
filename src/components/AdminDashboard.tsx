@@ -777,7 +777,7 @@ function FixtureManager({ league }: { league: League }) {
       ]);
       setPairs((pairsRes.data ?? []) as Pair[]);
       setMatches((matchesRes.data ?? []) as Match[]);
-      setExpandedCats(new Set([cs[0].id]));
+      setExpandedCats((prev) => prev.size === 0 ? new Set([cs[0].id]) : prev);
     } else {
       setPairs([]); setMatches([]);
     }
