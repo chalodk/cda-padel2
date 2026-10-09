@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import {
   Trophy, Users, Calendar, ChartColumn, LogOut, Plus, Trash2, Pencil,
-  ChevronDown, ChevronRight, Zap, ListChecks,
+  ChevronDown, ChevronRight, Zap, ListChecks, GripVertical,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth';
@@ -937,11 +937,12 @@ function ScheduleEditor({ matches, pairMap, onUpdated }: {
   onUpdated: () => void;
 }) {
   const [saving, setSaving] = useState<string | null>(null);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dragOverRound, setDragOverRound] = useState<number | null>(null);
 
   const byRound = new Map<number, Match[]>();
   matches.forEach((m) => { const a = byRound.get(m.round) ?? []; a.push(m); byRound.set(m.round, a); });
   const rounds = Array.from(byRound.keys()).sort((a, b) => a - b);
-  const maxRound = rounds.length > 0 ? Math.max(...rounds.filter((r) => r < 100)) : 0;
 
   const updateDate = async (matchId: string, dateStr: string) => {
     setSaving(matchId);
@@ -951,11 +952,14 @@ function ScheduleEditor({ matches, pairMap, onUpdated }: {
     onUpdated();
   };
 
-  const moveRound = async (match: Match, newRound: number) => {
-    if (newRound === match.round) return;
-    setSaving(match.id);
-    await supabase.from('matches').update({ round: newRound }).eq('id', match.id);
+  const moveToRound = async (matchId: string, newRound: number) => {
+    const match = matches.find((m) => m.id === matchId);
+    if (!match || match.round === newRound) return;
+    setSaving(matchId);
+    await supabase.from('matches').update({ round: newRound }).eq('id', matchId);
     setSaving(null);
+    setDragId(null);
+    setDragOverRound(null);
     onUpdated();
   };
 
@@ -969,54 +973,73 @@ function ScheduleEditor({ matches, pairMap, onUpdated }: {
 
   return (
     <div>
-      <p className="text-xs font-semibold text-ink-500 uppercase tracking-wide mb-3">Programar fechas</p>
-      <div className="space-y-4">
-        {rounds.map((round) => (
-          <div key={round} className="bg-white rounded-lg border border-ink-100 p-3">
-            <div className="flex items-center gap-2 mb-2">
-              <h4 className="text-xs font-display font-semibold text-ink-700">{roundLabel(round)}</h4>
-              <span className="text-xs text-ink-400">· {byRound.get(round)!.length} partidos</span>
-            </div>
-            <div className="space-y-2">
-              {byRound.get(round)!.map((m) => {
-                const p1 = pairMap.get(m.pair1_id)?.name ?? '—';
-                const p2 = pairMap.get(m.pair2_id)?.name ?? '—';
-                return (
-                  <div key={m.id} className="flex flex-col sm:flex-row sm:items-center gap-2 bg-ink-50 rounded-lg px-3 py-2">
-                    <div className="flex-1 min-w-0 text-xs">
-                      <span className="font-medium text-ink-800 truncate">{p1}</span>
-                      <span className="text-ink-400 mx-1">vs</span>
-                      <span className="font-medium text-ink-800 truncate">{p2}</span>
+      <p className="text-xs font-semibold text-ink-500 uppercase tracking-wide mb-1">Arrastra los partidos entre las fechas</p>
+      <p className="text-xs text-ink-400 mb-3">Mantén presionado y arrastra la tarjeta del partido a la fecha donde quieras reprogramarla.</p>
+      <div className="space-y-3">
+        {rounds.map((round) => {
+          const isDropTarget = dragOverRound === round && dragId !== null;
+          const roundMatches = byRound.get(round)!;
+          return (
+            <div
+              key={round}
+              onDragOver={(e) => { e.preventDefault(); if (dragId && dragOverRound !== round) setDragOverRound(round); }}
+              onDragLeave={(e) => { if (dragOverRound === round) setDragOverRound(null); }}
+              onDrop={(e) => { e.preventDefault(); if (dragId) moveToRound(dragId, round); }}
+              className={`rounded-lg border-2 p-3 transition-all ${
+                isDropTarget
+                  ? 'border-brand-500 bg-brand-50/60'
+                  : 'border-ink-100 bg-white'
+              }`}
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <h4 className="text-xs font-display font-semibold text-ink-700">{roundLabel(round)}</h4>
+                <span className="text-xs text-ink-400">· {roundMatches.length} partidos</span>
+                {roundMatches.some((m) => m.scheduled_date) && (
+                  <span className="text-xs text-ink-500 ml-auto">
+                    {new Date(roundMatches.find((m) => m.scheduled_date)!.scheduled_date!).toLocaleDateString('es', { day: 'numeric', month: 'short' })}
+                  </span>
+                )}
+              </div>
+              <div className="space-y-2">
+                {roundMatches.map((m) => {
+                  const p1 = pairMap.get(m.pair1_id)?.name ?? '—';
+                  const p2 = pairMap.get(m.pair2_id)?.name ?? '—';
+                  const isDragging = dragId === m.id;
+                  return (
+                    <div
+                      key={m.id}
+                      draggable={saving === null}
+                      onDragStart={() => setDragId(m.id)}
+                      onDragEnd={() => { setDragId(null); setDragOverRound(null); }}
+                      className={`group flex flex-col sm:flex-row sm:items-center gap-2 rounded-lg px-3 py-2 cursor-grab active:cursor-grabbing transition-all ${
+                        isDragging ? 'opacity-40 ring-2 ring-brand-400' : 'bg-ink-50 hover:bg-ink-100'
+                      } ${saving === m.id ? 'pointer-events-none' : ''}`}
+                    >
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <GripVertical className="w-3.5 h-3.5 text-ink-300 flex-shrink-0 group-hover:text-ink-500 transition-colors" />
+                        <div className="min-w-0 text-xs">
+                          <span className="font-medium text-ink-800 truncate">{p1}</span>
+                          <span className="text-ink-400 mx-1">vs</span>
+                          <span className="font-medium text-ink-800 truncate">{p2}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="date"
+                          className="input text-xs py-1.5 w-auto"
+                          value={toDateInput(m.scheduled_date)}
+                          onChange={(e) => updateDate(m.id, e.target.value)}
+                          disabled={saving === m.id}
+                        />
+                        {saving === m.id && <span className="text-xs text-ink-400">Guardando...</span>}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <select
-                        className="input text-xs py-1.5 w-auto"
-                        value={m.round}
-                        onChange={(e) => moveRound(m, Number(e.target.value))}
-                        disabled={saving === m.id}
-                      >
-                        {Array.from({ length: maxRound }, (_, i) => i + 1).map((r) => (
-                          <option key={r} value={r}>{roundLabel(r)}</option>
-                        ))}
-                        {rounds.some((r) => r >= 100) && (
-                          <option value={100}>{roundLabel(100)}</option>
-                        )}
-                      </select>
-                      <input
-                        type="date"
-                        className="input text-xs py-1.5 w-auto"
-                        value={toDateInput(m.scheduled_date)}
-                        onChange={(e) => updateDate(m.id, e.target.value)}
-                        disabled={saving === m.id}
-                      />
-                      {saving === m.id && <span className="text-xs text-ink-400">Guardando...</span>}
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
