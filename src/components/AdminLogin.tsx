@@ -44,16 +44,7 @@ export function AdminLogin() {
               <LogIn className="w-4 h-4" />
               Ingresar
             </button>
-            <button
-              type="button"
-              onClick={() => { setMode('signup'); setError(null); }}
-              className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-sm font-medium transition-all ${
-                mode === 'signup' ? 'bg-white text-ink-900 shadow-sm' : 'text-ink-500'
-              }`}
-            >
-              <UserPlus className="w-4 h-4" />
-              Crear cuenta
-            </button>
+            
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
