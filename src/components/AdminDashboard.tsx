@@ -275,6 +275,7 @@ function LeaguesManager({ leagues, onReload, selectedLeagueId, onSelectLeague }:
 // ==================== PLAYERS MANAGER ====================
 function PlayersManager() {
   const [players, setPlayers] = useState<Player[]>([]);
+  const [playerCategories, setPlayerCategories] = useState<Map<string, string[]>>(new Map());
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Player | null>(null);
@@ -287,8 +288,19 @@ function PlayersManager() {
   const [search, setSearch] = useState('');
 
   const load = useCallback(async () => {
-    const { data } = await supabase.from('players').select('*').order('last_name', { ascending: true });
+    const [{ data }, { data: registrations }] = await Promise.all([
+      supabase.from('players').select('*').order('last_name', { ascending: true }),
+      supabase.from('player_category_registrations').select('player_id, categories(name)'),
+    ]);
     setPlayers((data ?? []) as Player[]);
+    const categoryMap = new Map<string, string[]>();
+    (registrations ?? []).forEach((registration) => {
+      const category = registration.categories as { name: string } | { name: string }[] | null;
+      const categoryName = Array.isArray(category) ? category[0]?.name : category?.name;
+      if (!categoryName) return;
+      categoryMap.set(registration.player_id, [...(categoryMap.get(registration.player_id) ?? []), categoryName]);
+    });
+    setPlayerCategories(categoryMap);
     setLoading(false);
   }, []);
 
@@ -361,6 +373,7 @@ function PlayersManager() {
                 <th className="px-4 py-3 text-left font-semibold">Nombre</th>
                 <th className="px-4 py-3 text-left font-semibold hidden sm:table-cell">Teléfono</th>
                 <th className="px-4 py-3 text-left font-semibold hidden md:table-cell">Email</th>
+                <th className="px-4 py-3 text-left font-semibold">Categoría</th>
                 <th className="px-4 py-3 text-right font-semibold">Acciones</th>
               </tr>
             </thead>
@@ -370,6 +383,7 @@ function PlayersManager() {
                   <td className="px-4 py-3 font-medium text-ink-900">{p.first_name} {p.last_name}</td>
                   <td className="px-4 py-3 text-ink-600 hidden sm:table-cell">{p.phone ?? '—'}</td>
                   <td className="px-4 py-3 text-ink-600 hidden md:table-cell">{p.email ?? '—'}</td>
+                  <td className="px-4 py-3 text-ink-600">{playerCategories.get(p.id)?.join(', ') ?? '—'}</td>
                   <td className="px-4 py-3">
                     <div className="flex gap-1 justify-end">
                       <button onClick={() => openEdit(p)} className="p-2 text-ink-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors">
@@ -537,8 +551,14 @@ function PairsManager({ league, onGoToPlayers }: { league: League; onGoToPlayers
   const savePair = async () => {
     if (!pairP1 || !pairP2 || pairP1 === pairP2) return;
     setSaving(true);
+    const player1 = playerMap.get(pairP1);
+    const player2 = playerMap.get(pairP2);
+    const generatedName = `${player1?.first_name ?? ''} y ${player2?.first_name ?? ''}`.trim();
     await supabase.from('pairs').insert({
-      category_id: pairCategory, name: pairName, player1_id: pairP1, player2_id: pairP2,
+      category_id: pairCategory,
+      name: pairName.trim() || generatedName,
+      player1_id: pairP1,
+      player2_id: pairP2,
     });
     setSaving(false);
     setShowPairForm(false);
@@ -696,10 +716,7 @@ function PairsManager({ league, onGoToPlayers }: { league: League; onGoToPlayers
       {/* Pair modal */}
       <Modal open={showPairForm} onClose={() => setShowPairForm(false)} title="Nueva dupla">
         <div className="space-y-4">
-          <div>
-            <label className="label">Nombre de la dupla</label>
-            <input className="input" value={pairName} onChange={(e) => setPairName(e.target.value)} placeholder="Ej: Los del fondo" />
-          </div>
+          <p className="text-sm text-ink-500">El nombre se completará automáticamente con los nombres de los jugadores si lo dejas vacío.</p>
           <div>
             <label className="label">Jugador 1</label>
             <select className="input" value={pairP1} onChange={(e) => setPairP1(e.target.value)}>
@@ -725,7 +742,7 @@ function PairsManager({ league, onGoToPlayers }: { league: League; onGoToPlayers
           </div>
           <div className="flex gap-3 justify-end pt-2">
             <button onClick={() => setShowPairForm(false)} className="btn-secondary">Cancelar</button>
-            <button onClick={savePair} disabled={saving || !pairP1 || !pairP2 || pairP1 === pairP2 || !pairName.trim()} className="btn-primary">
+            <button onClick={savePair} disabled={saving || !pairP1 || !pairP2 || pairP1 === pairP2} className="btn-primary">
               {saving ? 'Guardando...' : 'Guardar'}
             </button>
           </div>

@@ -65,31 +65,6 @@ function AppContent() {
 
       <PublicView />
 
-      <div className="max-w-6xl mx-auto px-4 mt-8 mb-8">
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-brand-700 via-brand-600 to-brand-500 shadow-lg">
-          <div className="absolute inset-0 opacity-10">
-            <div className="absolute -right-8 -top-8 w-40 h-40 rounded-full bg-white" />
-            <div className="absolute -left-4 -bottom-12 w-32 h-32 rounded-full bg-white" />
-          </div>
-          <div className="relative flex flex-col sm:flex-row items-center justify-between gap-4 px-6 py-8 sm:px-10">
-            <div className="text-center sm:text-left">
-              <h2 className="text-xl sm:text-2xl font-display font-bold text-white mb-1">
-                Regístrate acá para jugar todos los días
-              </h2>
-              <p className="text-sm text-brand-100">
-                Únete a la comunidad de pádel y participa en las próximas ligas
-              </p>
-            </div>
-            <button
-              className="flex items-center gap-2 bg-white text-brand-700 font-semibold px-6 py-3 rounded-xl shadow-md hover:shadow-lg hover:bg-brand-50 transition-all whitespace-nowrap"
-              onClick={() => alert('Próximamente: el registro de jugadores estará disponible aquí.')}
-            >
-              Quiero participar
-            </button>
-          </div>
-        </div>
-      </div>
-
       <footer className="border-t border-ink-200 mt-12">
         <div className="max-w-6xl mx-auto px-4 py-6 text-center text-sm text-ink-400">
           Liga de Pádel · Sistema de gestión de ligas

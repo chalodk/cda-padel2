@@ -1,10 +1,10 @@
 import { useEffect, useState, useMemo } from 'react';
 import {
-  Trophy, Calendar, ChartColumn, Users, ChevronDown, ChevronRight, MapPin,
+  Trophy, Calendar, ChartColumn, Users, ChevronDown, ChevronRight, MapPin, CheckCircle,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { calculateStandings } from '@/lib/standings';
-import { StatusBadge, LoadingSpinner, EmptyState } from '@/components/ui';
+import { StatusBadge, LoadingSpinner, EmptyState, Modal } from '@/components/ui';
 import type {
   League, Category, Pair, Match, MatchSet, Player,
 } from '@/types';
@@ -18,6 +18,10 @@ export function PublicView() {
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [activeTab, setActiveTab] = useState<Tab>('standings');
   const [loading, setLoading] = useState(true);
+  const [showRegistration, setShowRegistration] = useState(false);
+  const [registrationStatus, setRegistrationStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
+  const [registrationError, setRegistrationError] = useState('');
+  const [registrationForm, setRegistrationForm] = useState({ firstName: '', lastName: '', phone: '', email: '', categoryId: '' });
   const [data, setData] = useState<{
     pairs: Pair[];
     players: Player[];
@@ -142,6 +146,45 @@ export function PublicView() {
     });
   };
 
+  const submitRegistration = async () => {
+    if (!registrationForm.firstName.trim() || !registrationForm.lastName.trim()) return;
+    setRegistrationStatus('saving');
+    setRegistrationError('');
+    const { data: player, error: playerError } = await supabase.from('players').insert({
+      first_name: registrationForm.firstName.trim(),
+      last_name: registrationForm.lastName.trim(),
+      phone: registrationForm.phone.trim() || null,
+      email: registrationForm.email.trim() || null,
+    }).select().maybeSingle();
+
+    if (playerError || !player) {
+      setRegistrationStatus('error');
+      setRegistrationError('No pudimos completar el registro. Revisa tus datos e inténtalo nuevamente.');
+      return;
+    }
+
+    if (registrationForm.categoryId) {
+      const { error: categoryError } = await supabase.from('player_category_registrations').insert({
+        player_id: player.id,
+        category_id: registrationForm.categoryId,
+      });
+      if (categoryError) {
+        setRegistrationStatus('error');
+        setRegistrationError('El registro se guardó, pero no pudimos asociar la categoría.');
+        return;
+      }
+    }
+
+    setRegistrationStatus('success');
+    setRegistrationForm({ firstName: '', lastName: '', phone: '', email: '', categoryId: '' });
+  };
+
+  const closeRegistration = () => {
+    setShowRegistration(false);
+    setRegistrationStatus('idle');
+    setRegistrationError('');
+  };
+
   const activeLeagues = leagues.filter((l) => l.status === 'active');
   const draftLeagues = leagues.filter((l) => l.status === 'draft');
   const completedLeagues = leagues.filter((l) => l.status === 'completed');
@@ -245,6 +288,53 @@ export function PublicView() {
           })}
         </div>
       )}
+
+      <div className="mt-8 relative overflow-hidden rounded-2xl bg-gradient-to-r from-brand-700 via-brand-600 to-brand-500 shadow-lg">
+        <div className="relative flex flex-col sm:flex-row items-center justify-between gap-4 px-6 py-8 sm:px-10">
+          <div className="text-center sm:text-left">
+            <h2 className="text-xl sm:text-2xl font-display font-bold text-white mb-1">Regístrate para jugar</h2>
+            <p className="text-sm text-brand-100">Únete a la comunidad de pádel y participa en las próximas ligas.</p>
+          </div>
+          <button onClick={() => setShowRegistration(true)} className="bg-white text-brand-700 font-semibold px-6 py-3 rounded-xl shadow-md hover:shadow-lg hover:bg-brand-50 transition-all whitespace-nowrap">
+            Quiero participar
+          </button>
+        </div>
+      </div>
+
+      <Modal open={showRegistration} onClose={closeRegistration} title="Quiero participar">
+        {registrationStatus === 'success' ? (
+          <div className="py-6 text-center">
+            <CheckCircle className="w-12 h-12 text-brand-600 mx-auto mb-4" />
+            <h3 className="text-lg font-display font-semibold text-ink-900">¡Registro recibido!</h3>
+            <p className="text-sm text-ink-500 mt-2">Tus datos fueron enviados correctamente.</p>
+            <button onClick={closeRegistration} className="btn-primary mt-6">Cerrar</button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <p className="text-sm text-ink-500">Completa tus datos y, si quieres, elige una categoría.</p>
+            <div className="grid grid-cols-2 gap-4">
+              <div><label className="label">Nombre</label><input className="input" value={registrationForm.firstName} onChange={(e) => setRegistrationForm((current) => ({ ...current, firstName: e.target.value }))} /></div>
+              <div><label className="label">Apellido</label><input className="input" value={registrationForm.lastName} onChange={(e) => setRegistrationForm((current) => ({ ...current, lastName: e.target.value }))} /></div>
+            </div>
+            <div><label className="label">Teléfono</label><input className="input" value={registrationForm.phone} onChange={(e) => setRegistrationForm((current) => ({ ...current, phone: e.target.value }))} placeholder="+56 9 1234 5678" /></div>
+            <div><label className="label">Email</label><input type="email" className="input" value={registrationForm.email} onChange={(e) => setRegistrationForm((current) => ({ ...current, email: e.target.value }))} /></div>
+            <div>
+              <label className="label">Categoría <span className="font-normal text-ink-400">(opcional)</span></label>
+              <select className="input" value={registrationForm.categoryId} onChange={(e) => setRegistrationForm((current) => ({ ...current, categoryId: e.target.value }))}>
+                <option value="">Aún no lo sé</option>
+                {categories.map((category) => <option key={category.id} value={category.id}>{category.name} · {category.modality} {category.level}</option>)}
+              </select>
+            </div>
+            {registrationStatus === 'error' && <p className="text-sm text-red-600">{registrationError}</p>}
+            <div className="flex gap-3 justify-end pt-2">
+              <button onClick={closeRegistration} className="btn-secondary">Cancelar</button>
+              <button onClick={submitRegistration} disabled={registrationStatus === 'saving' || !registrationForm.firstName.trim() || !registrationForm.lastName.trim()} className="btn-primary">
+                {registrationStatus === 'saving' ? 'Enviando...' : 'Enviar registro'}
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

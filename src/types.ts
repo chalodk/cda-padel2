@@ -30,6 +30,13 @@ export interface Player {
   created_at: string;
 }
 
+export interface PlayerCategoryRegistration {
+  id: string;
+  player_id: string;
+  category_id: string;
+  created_at: string;
+}
+
 export interface Pair {
   id: string;
   category_id: string;
