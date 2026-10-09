@@ -887,7 +887,7 @@ function FixtureManager({ league }: { league: League }) {
                 )}
                 {isOpen && hasFixture && (
                   <div className="border-t border-ink-100 px-5 py-3 bg-ink-50/50">
-                    <ScheduleEditor matches={catMatches} onUpdated={load} />
+                    <ScheduleEditor matches={catMatches} pairMap={pairMap} onUpdated={load} />
                   </div>
                 )}
                 {isOpen && !hasFixture && catPairs.length < 2 && (
@@ -931,13 +931,30 @@ function FixturePreview({ matches, pairMap }: { matches: Match[]; pairMap: Map<s
   );
 }
 
-function ScheduleEditor({ matches, onUpdated }: { matches: Match[]; onUpdated: () => void }) {
+function ScheduleEditor({ matches, pairMap, onUpdated }: {
+  matches: Match[];
+  pairMap: Map<string, Pair>;
+  onUpdated: () => void;
+}) {
   const [saving, setSaving] = useState<string | null>(null);
+
+  const byRound = new Map<number, Match[]>();
+  matches.forEach((m) => { const a = byRound.get(m.round) ?? []; a.push(m); byRound.set(m.round, a); });
+  const rounds = Array.from(byRound.keys()).sort((a, b) => a - b);
+  const maxRound = rounds.length > 0 ? Math.max(...rounds.filter((r) => r < 100)) : 0;
 
   const updateDate = async (matchId: string, dateStr: string) => {
     setSaving(matchId);
     const scheduled_date = dateStr ? new Date(dateStr + 'T00:00:00').toISOString() : null;
     await supabase.from('matches').update({ scheduled_date }).eq('id', matchId);
+    setSaving(null);
+    onUpdated();
+  };
+
+  const moveRound = async (match: Match, newRound: number) => {
+    if (newRound === match.round) return;
+    setSaving(match.id);
+    await supabase.from('matches').update({ round: newRound }).eq('id', match.id);
     setSaving(null);
     onUpdated();
   };
@@ -948,29 +965,59 @@ function ScheduleEditor({ matches, onUpdated }: { matches: Match[]; onUpdated: (
     return d.toISOString().slice(0, 10);
   };
 
-  const byRound = new Map<number, Match[]>();
-  matches.forEach((m) => { const a = byRound.get(m.round) ?? []; a.push(m); byRound.set(m.round, a); });
-  const rounds = Array.from(byRound.keys()).sort((a, b) => a - b);
+  const roundLabel = (r: number) => r >= 100 ? 'Cuadrangular' : `Fecha ${r}`;
 
   return (
     <div>
       <p className="text-xs font-semibold text-ink-500 uppercase tracking-wide mb-3">Programar fechas</p>
-      {rounds.map((round) => (
-        <div key={round} className="mb-3 last:mb-0">
-          {byRound.get(round)!.map((m) => (
-            <div key={m.id} className="flex items-center gap-2 mb-1.5 last:mb-0">
-              <input
-                type="date"
-                className="input text-xs py-1.5 w-auto"
-                value={toDateInput(m.scheduled_date)}
-                onChange={(e) => updateDate(m.id, e.target.value)}
-                disabled={saving === m.id}
-              />
-              {saving === m.id && <span className="text-xs text-ink-400">Guardando...</span>}
+      <div className="space-y-4">
+        {rounds.map((round) => (
+          <div key={round} className="bg-white rounded-lg border border-ink-100 p-3">
+            <div className="flex items-center gap-2 mb-2">
+              <h4 className="text-xs font-display font-semibold text-ink-700">{roundLabel(round)}</h4>
+              <span className="text-xs text-ink-400">· {byRound.get(round)!.length} partidos</span>
             </div>
-          ))}
-        </div>
-      ))}
+            <div className="space-y-2">
+              {byRound.get(round)!.map((m) => {
+                const p1 = pairMap.get(m.pair1_id)?.name ?? '—';
+                const p2 = pairMap.get(m.pair2_id)?.name ?? '—';
+                return (
+                  <div key={m.id} className="flex flex-col sm:flex-row sm:items-center gap-2 bg-ink-50 rounded-lg px-3 py-2">
+                    <div className="flex-1 min-w-0 text-xs">
+                      <span className="font-medium text-ink-800 truncate">{p1}</span>
+                      <span className="text-ink-400 mx-1">vs</span>
+                      <span className="font-medium text-ink-800 truncate">{p2}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <select
+                        className="input text-xs py-1.5 w-auto"
+                        value={m.round}
+                        onChange={(e) => moveRound(m, Number(e.target.value))}
+                        disabled={saving === m.id}
+                      >
+                        {Array.from({ length: maxRound }, (_, i) => i + 1).map((r) => (
+                          <option key={r} value={r}>{roundLabel(r)}</option>
+                        ))}
+                        {rounds.some((r) => r >= 100) && (
+                          <option value={100}>{roundLabel(100)}</option>
+                        )}
+                      </select>
+                      <input
+                        type="date"
+                        className="input text-xs py-1.5 w-auto"
+                        value={toDateInput(m.scheduled_date)}
+                        onChange={(e) => updateDate(m.id, e.target.value)}
+                        disabled={saving === m.id}
+                      />
+                      {saving === m.id && <span className="text-xs text-ink-400">Guardando...</span>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
