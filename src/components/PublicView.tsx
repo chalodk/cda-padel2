@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import {
   Trophy, Calendar, ChartColumn, Users, ChevronDown, ChevronRight, MapPin, CheckCircle,
+  Search,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { calculateStandings } from '@/lib/standings';
@@ -22,6 +23,7 @@ export function PublicView() {
   const [registrationStatus, setRegistrationStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
   const [registrationError, setRegistrationError] = useState('');
   const [registrationForm, setRegistrationForm] = useState({ firstName: '', lastName: '', phone: '', email: '', categoryId: '' });
+  const [fixtureSearch, setFixtureSearch] = useState('');
   const [data, setData] = useState<{
     pairs: Pair[];
     players: Player[];
@@ -238,6 +240,19 @@ export function PublicView() {
         <TabButton active={activeTab === 'fixture'} onClick={() => setActiveTab('fixture')} icon={Calendar} label="Fixture" />
       </div>
 
+      {activeTab === 'fixture' && categories.length > 0 && (
+        <div className="relative mb-4">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400" />
+          <input
+            type="text"
+            className="input pl-9"
+            placeholder="Buscar dupla... (ej: Gonzalo y Gonzalo)"
+            value={fixtureSearch}
+            onChange={(e) => setFixtureSearch(e.target.value)}
+          />
+        </div>
+      )}
+
       {loading ? (
         <LoadingSpinner />
       ) : categories.length === 0 ? (
@@ -247,8 +262,16 @@ export function PublicView() {
           {categories.map((cat) => {
             const isOpen = expandedCategories.has(cat.id);
             const catPairs = pairsByCategory.get(cat.id) ?? [];
-            const catMatches = matchesByCategory.get(cat.id) ?? [];
-
+            const allCatMatches = matchesByCategory.get(cat.id) ?? [];
+            const q = fixtureSearch.trim().toLowerCase();
+            const catMatches = q
+              ? allCatMatches.filter((m) => {
+                  const p1 = pairMap.get(m.pair1_id)?.name?.toLowerCase() ?? '';
+                  const p2 = pairMap.get(m.pair2_id)?.name?.toLowerCase() ?? '';
+                  return p1.includes(q) || p2.includes(q);
+                })
+              : allCatMatches;
+            if (q && catMatches.length === 0) return null;
             return (
               <div key={cat.id} className="card overflow-hidden">
                 <button

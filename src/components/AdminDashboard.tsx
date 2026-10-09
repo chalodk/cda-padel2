@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import {
   Trophy, Users, Calendar, ChartColumn, LogOut, Plus, Trash2, Pencil,
-  ChevronDown, ChevronRight, Zap, ListChecks, GripVertical,
+  ChevronDown, ChevronRight, Zap, ListChecks, GripVertical, Search,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth';
@@ -764,6 +764,7 @@ function FixtureManager({ league }: { league: League }) {
   const [expandedCats, setExpandedCats] = useState<Set<string>>(new Set());
   const [generating, setGenerating] = useState<string | null>(null);
   const [clearing, setClearing] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
 
   const load = useCallback(async () => {
     const { data: cats } = await supabase.from('categories').select('*').eq('league_id', league.id).order('modality').order('level');
@@ -838,6 +839,19 @@ function FixtureManager({ league }: { league: League }) {
     <div>
       <h2 className="text-lg font-display font-semibold text-ink-900 mb-4">Fixture</h2>
 
+      {categories.length > 0 && (
+        <div className="relative mb-4">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400" />
+          <input
+            type="text"
+            className="input pl-9"
+            placeholder="Buscar dupla... (ej: Gonzalo y Gonzalo)"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+      )}
+
       {categories.length === 0 ? (
         <EmptyState icon={Calendar} title="Sin categorías" message="Crea categorías y duplas primero." />
       ) : (
@@ -845,8 +859,18 @@ function FixtureManager({ league }: { league: League }) {
           {categories.map((cat) => {
             const isOpen = expandedCats.has(cat.id);
             const catPairs = pairsByCat.get(cat.id) ?? [];
-            const catMatches = matchesByCat.get(cat.id) ?? [];
-            const hasFixture = catMatches.length > 0;
+            const allCatMatches = matchesByCat.get(cat.id) ?? [];
+            const q = search.trim().toLowerCase();
+            const catMatches = q
+              ? allCatMatches.filter((m) => {
+                  const p1 = pairMap.get(m.pair1_id)?.name?.toLowerCase() ?? '';
+                  const p2 = pairMap.get(m.pair2_id)?.name?.toLowerCase() ?? '';
+                  return p1.includes(q) || p2.includes(q);
+                })
+              : allCatMatches;
+            const hasFixture = allCatMatches.length > 0;
+            const showCat = !q || catMatches.length > 0;
+            if (!showCat) return null;
             return (
               <div key={cat.id} className="card overflow-hidden">
                 <div className="flex items-center justify-between px-5 py-4">
@@ -882,7 +906,11 @@ function FixtureManager({ league }: { league: League }) {
 
                 {isOpen && hasFixture && (
                   <div className="border-t border-ink-100 px-5 py-4 animate-slide-up">
-                    <ScheduleEditor matches={catMatches} pairMap={pairMap} onUpdated={load} />
+                    {catMatches.length === 0 ? (
+                      <p className="text-sm text-ink-400 text-center py-4">No hay partidos que coincidan con la búsqueda.</p>
+                    ) : (
+                      <ScheduleEditor matches={catMatches} pairMap={pairMap} onUpdated={load} />
+                    )}
                   </div>
                 )}
                 {isOpen && !hasFixture && catPairs.length < 2 && (
