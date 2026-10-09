@@ -881,12 +881,7 @@ function FixtureManager({ league }: { league: League }) {
                 </div>
 
                 {isOpen && hasFixture && (
-                  <div className="border-t border-ink-100 animate-slide-up">
-                    <FixturePreview matches={catMatches} pairMap={pairMap} />
-                  </div>
-                )}
-                {isOpen && hasFixture && (
-                  <div className="border-t border-ink-100 px-5 py-3 bg-ink-50/50">
+                  <div className="border-t border-ink-100 px-5 py-4 animate-slide-up">
                     <ScheduleEditor matches={catMatches} pairMap={pairMap} onUpdated={load} />
                   </div>
                 )}
@@ -900,33 +895,6 @@ function FixtureManager({ league }: { league: League }) {
           })}
         </div>
       )}
-    </div>
-  );
-}
-
-function FixturePreview({ matches, pairMap }: { matches: Match[]; pairMap: Map<string, Pair> }) {
-  const byRound = new Map<number, Match[]>();
-  matches.forEach((m) => { const a = byRound.get(m.round) ?? []; a.push(m); byRound.set(m.round, a); });
-  const rounds = Array.from(byRound.keys()).sort((a, b) => a - b);
-
-  return (
-    <div className="px-5 py-4">
-      {rounds.map((round) => (
-        <div key={round} className="mb-4 last:mb-0">
-          <h4 className="text-xs font-semibold text-ink-500 uppercase tracking-wide mb-2">
-            {round >= 100 ? 'Cuadrangular' : `Fecha ${round}`}
-          </h4>
-          <div className="space-y-1.5">
-            {byRound.get(round)!.map((m) => (
-              <div key={m.id} className="flex items-center gap-2 text-sm bg-ink-50 rounded-lg px-3 py-2">
-                <span className="font-medium text-ink-800 flex-1 truncate">{pairMap.get(m.pair1_id)?.name ?? '—'}</span>
-                <span className="text-xs text-ink-400">vs</span>
-                <span className="font-medium text-ink-800 flex-1 truncate text-right">{pairMap.get(m.pair2_id)?.name ?? '—'}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      ))}
     </div>
   );
 }
@@ -1022,6 +990,7 @@ function ScheduleEditor({ matches, pairMap, onUpdated }: {
                           <span className="text-ink-400 mx-1">vs</span>
                           <span className="font-medium text-ink-800 truncate">{p2}</span>
                         </div>
+                        <StatusBadge status={m.status} />
                       </div>
                       <div className="flex items-center gap-2">
                         <input
