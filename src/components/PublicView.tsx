@@ -454,7 +454,7 @@ function StandingsTable({ pairs, matches, sets, playerMap }: {
         </tbody>
       </table>
       <div className="px-4 py-2 text-xs text-ink-400 border-t border-ink-100">
-        Orden: Sets ganados → Diferencia de games. PJ=Partidos jugados, PG=Ganados, PP=Perdidos
+        Orden: Puntos → Diferencia de sets → Diferencia de juegos. PJ=Partidos jugados, PG=Ganados, PP=Perdidos
       </div>
     </div>
   );

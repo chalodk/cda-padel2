@@ -84,10 +84,12 @@ export function calculateStandings(
     r.games_diff = r.games_won - r.games_lost;
   }
 
-  // Sort by: points desc → sets_won desc → games_diff desc
+  // Sort by: points desc → set diff desc → games_diff desc
   return Array.from(rows.values()).sort((a, b) => {
     if (b.points !== a.points) return b.points - a.points;
-    if (b.sets_won !== a.sets_won) return b.sets_won - a.sets_won;
+    const setDiffA = a.sets_won - a.sets_lost;
+    const setDiffB = b.sets_won - b.sets_lost;
+    if (setDiffB !== setDiffA) return setDiffB - setDiffA;
     return b.games_diff - a.games_diff;
   });
 }
